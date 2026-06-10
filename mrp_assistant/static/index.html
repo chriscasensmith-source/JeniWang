@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MRP Ordering Assistant</title>
+<style>
+  :root {
+    --red-bg: #fde8e8; --red-fg: #9b1c1c;
+    --yellow-bg: #fdf6b2; --yellow-fg: #8a6d00;
+    --green-bg: #f3faf3; --green-fg: #2f6f3e;
+    --border: #d5d5d5; --muted: #777;
+  }
+  * { box-sizing: border-box; }
+  body { font: 12px/1.35 -apple-system, "Segoe UI", Arial, sans-serif; margin: 0; background: #fafafa; color: #222; }
+  header { position: sticky; top: 0; z-index: 10; background: #1f2937; color: #eee; padding: 6px 10px;
+           display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  header h1 { font-size: 14px; margin: 0 8px 0 0; white-space: nowrap; }
+  header label { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+  header select, header input[type=search] { font-size: 12px; padding: 2px 4px; }
+  header .msgtypes label { margin-right: 6px; }
+  header a.btn, header button.btn { background: #374151; color: #eee; border: 1px solid #555;
+    border-radius: 3px; padding: 2px 8px; font-size: 11px; text-decoration: none; cursor: pointer; }
+  main { padding: 8px 10px 60px; max-width: 1500px; margin: 0 auto; }
+  .summary { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 12px; }
+  .summary b { font-size: 15px; }
+  .pill { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); background: #fff; }
+  .pill.red { background: var(--red-bg); color: var(--red-fg); }
+  .pill.yellow { background: var(--yellow-bg); color: var(--yellow-fg); }
+  .pill.green { background: var(--green-bg); color: var(--green-fg); }
+  section { margin-bottom: 16px; }
+  section > h2 { font-size: 13px; margin: 10px 0 4px; border-bottom: 2px solid #1f2937; padding-bottom: 2px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; }
+  th, td { border: 1px solid var(--border); padding: 2px 5px; text-align: left; white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  thead th { background: #eef0f3; position: sticky; top: 34px; }
+  tr.row { cursor: pointer; }
+  tr.RED td { background: var(--red-bg); }
+  tr.RED td.slack { color: var(--red-fg); font-weight: 700; }
+  tr.YELLOW td { background: var(--yellow-bg); }
+  tr.YELLOW td.slack { color: var(--yellow-fg); font-weight: 700; }
+  tr.GREEN td { background: var(--green-bg); }
+  tr.detail td { background: #f4f6fa; font-family: ui-monospace, Consolas, monospace; font-size: 11px; white-space: normal; }
+  .desc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  details { margin: 4px 0; }
+  details > summary { cursor: pointer; font-weight: 600; padding: 3px 0; }
+  .supplier-group { border: 1px solid var(--border); background: #fff; margin: 8px 0; padding: 6px 8px; }
+  .supplier-group h3 { margin: 0 0 6px; font-size: 12.5px; }
+  .supplier-group h3 .coo { color: var(--muted); font-weight: 400; }
+  .cards { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  .card { border: 1px solid var(--border); border-left: 4px solid #1f2937; padding: 6px 8px; min-width: 330px; max-width: 480px; background: #fcfcfc; flex: 1; }
+  .card h4 { margin: 0 0 3px; font-size: 12px; }
+  .card .agg { font-size: 14px; font-weight: 700; }
+  .card .flag { color: var(--red-fg); font-weight: 600; }
+  .card .reco { display: inline-block; background: var(--green-bg); color: var(--green-fg); border: 1px solid #b7d8bd; border-radius: 3px; padding: 0 6px; font-weight: 700; }
+  .card .stay { display: inline-block; background: #f1f1f1; border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
+  .card table { font-size: 11px; margin-top: 4px; }
+  .card .trace td { background: #fff; }
+  .muted { color: var(--muted); }
+  .kind-NEW { color: #1d4ed8; font-weight: 700; }
+  .kind-RESOLVED { color: #2f6f3e; font-weight: 700; }
+  .kind-CHANGED { color: #b45309; font-weight: 700; }
+  .warn { background: #fff4e5; border: 1px solid #f0c177; padding: 4px 8px; margin: 4px 0; }
+  #error { color: var(--red-fg); font-weight: 700; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MRP Ordering Assistant</h1>
+  <label>Snapshot <select id="snapshotSel"></select></label>
+  <label><input type="radio" name="mode" value="snapshot" checked> as of snapshot</label>
+  <label><input type="radio" name="mode" value="today"> as of today</label>
+  <label>Supplier <select id="supplierSel"><option value="">all</option></select></label>
+  <span class="msgtypes" id="msgTypes"></span>
+  <label>Search <input type="search" id="searchBox" placeholder="item / description"></label>
+  <a class="btn" id="exportWorksheet" href="#">⬇ worksheet.xlsx</a>
+  <a class="btn" id="exportDiff" href="#">⬇ diff.xlsx</a>
+</header>
+<main>
+  <div id="error" hidden></div>
+  <div class="summary" id="summary"></div>
+  <div id="warnings"></div>
+
+  <section id="sec-fire">
+    <h2>1 · Fire drill — past due / expedite / should have ordered already</h2>
+    <div id="fireBody"></div>
+  </section>
+
+  <section id="sec-now">
+    <h2>2 · Order now — within the yellow window, grouped by supplier</h2>
+    <div id="nowBody"></div>
+  </section>
+
+  <section id="sec-horizon">
+    <details><summary><h2 style="display:inline">3 · Horizon — coming up soon</h2> <span class="muted" id="horizonCount"></span></summary>
+    <div id="horizonBody"></div></details>
+  </section>
+
+  <section id="sec-diff">
+    <h2>4 · This week vs last week</h2>
+    <div id="diffBody"></div>
+  </section>
+
+  <section>
+    <details><summary>All parsed lines (full worksheet view)</summary><div id="allBody"></div></details>
+  </section>
+
+  <section>
+    <details><summary>Paper trail — uploads log</summary><div id="uploadsBody"></div></details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const state = { meta: null, board: null, mode: "snapshot",
+                filters: { supplier: "", search: "", msgTypes: null } };
+
+const fmtQty = (n) => n == null ? "" : Number(n).toLocaleString("en-US", { maximumFractionDigits: 1 });
+const fmtMoney = (n) => n == null ? "" : "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtUnit = (n) => n == null ? "" : "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 5 });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function modeOf(line) { return line[state.mode]; }
+
+function visible(line) {
+  const f = state.filters;
+  if (f.supplier && line.supplier !== f.supplier) return false;
+  if (f.msgTypes && !f.msgTypes.has(line.msg_typ)) return false;
+  if (f.search) {
+    const hay = `${line.item_number} ${line.description || ""}`.toLowerCase();
+    if (!hay.includes(f.search.toLowerCase())) return false;
+  }
+  return true;
+}
+
+const COLS = [
+  ["Typ", (l) => l.msg_typ],
+  ["Item", (l) => l.item_number],
+  ["Description", (l) => `<span class="desc">${esc(l.description)}</span>`],
+  ["Supplier", (l) => esc(l.supplier_name)],
+  ["Qty", (l) => fmtQty(l.required_qty), "num"],
+  ["Request", (l) => l.request_date || ""],
+  ["Eff. deadline", (l) => l.effective_deadline || ""],
+  ["ORDER BY", (l) => `<b>${l.last_safe_order_date || ""}</b>`],
+  ["Arrives (dock)", (l) => modeOf(l).projected_dock_date || ""],
+  ["Slack", (l) => slackText(l), "num slack"],
+  ["Status", (l) => statusText(l)],
+];
+
+function slackText(l) {
+  const s = modeOf(l).slack_days;
+  if (s == null) return "";
+  return s < 0 ? `${s} (late ${-s}d)` : `+${s}`;
+}
+function statusText(l) {
+  const m = modeOf(l);
+  if (!l.actionable) return `<span class="muted">${l.msg_typ === "A" ? "warning-only" : "firm"}</span>`;
+  if (m.status === "RED") return "LATE";
+  if (m.status === "YELLOW") return "ORDER NOW";
+  if (m.status === "GREEN") return "soon";
+  if (m.status === "NONE") return `<span class="muted">early by ${m.early_by_days}d</span>`;
+  return "";
+}
+
+function rowsTable(lines, extraCols = []) {
+  if (!lines.length) return '<p class="muted">none</p>';
+  const cols = [...extraCols, ...COLS];
+  let html = "<table><thead><tr>" + cols.map(([h, , cls]) => `<th class="${cls || ""}">${h}</th>`).join("") + "</tr></thead><tbody>";
+  for (const l of lines) {
+    const cls = l.actionable ? (modeOf(l).status || "") : "";
+    html += `<tr class="row ${cls}" data-line="${l.line_id}">` +
+      cols.map(([, get, cls2]) => `<td class="${cls2 || ""}">${get(l) ?? ""}</td>`).join("") + "</tr>";
+  }
+  return html + "</tbody></table>";
+}
+
+function detailRow(l) {
+  const m = modeOf(l);
+  const fields = [
+    ["msg type", l.msg_typ], ["or ty", l.or_ty], ["message", l.message],
+    ["order number", l.order_number], ["demand branch", l.demand_branch],
+    ["lead time", l.lead_time + " days"], ["QA days", l.qa_days],
+    ["request date", l.request_date],
+    ["effective deadline (request − QA)", l.effective_deadline],
+    ["last safe order date (deadline − lead)", l.last_safe_order_date],
+    ["order date used", m.order_date],
+    ["projected dock (order + lead)", m.projected_dock_date],
+    ["projected arrival incl. QA", m.projected_arrival_with_qa],
+    ["slack days (deadline − dock)", m.slack_days],
+    ["source: sheet row", l.row_id], ["db line id", l.line_id],
+  ];
+  return fields.map(([k, v]) => `<b>${k}:</b> ${esc(v)}`).join(" &nbsp;·&nbsp; ");
+}
+
+document.addEventListener("click", (e) => {
+  const tr = e.target.closest("tr.row");
+  if (!tr) return;
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("detail")) { next.remove(); return; }
+  const line = state.board.lines.find((l) => l.line_id == tr.dataset.line);
+  if (!line) return;
+  const dr = document.createElement("tr");
+  dr.className = "detail";
+  dr.innerHTML = `<td colspan="${tr.children.length}">${detailRow(line)}</td>`;
+  tr.after(dr);
+});
+
+function tierCardHtml(card) {
+  let body = `<h4>${esc(card.item_number)} <span class="muted">${esc(card.description || "")}</span></h4>`;
+  body += `<div>Aggregate <span class="agg">${fmtQty(card.aggregate_qty)}</span> units ` +
+          `<span class="muted">(${card.consolidated_messages.length} msgs within ${card.horizon_days}d horizon)</span></div>`;
+
+  if (card.tier_status === "no_data") {
+    body += `<div class="flag">no tier data — request pricing</div>`;
+  } else if (card.tier_status === "incomplete") {
+    body += `<div class="flag">tier data incomplete — request pricing</div>` +
+            `<div class="muted">${esc((card.incomplete_reasons || []).join("; "))}</div>`;
+  } else if (card.tier_status === "below_minimum") {
+    const min = card.minimum_tier;
+    body += `<div class="flag">below lowest tier ${esc(min.tier_str)} (${fmtQty(min.qty)} @ ${fmtUnit(min.price)})` +
+            ` — short ${fmtQty(card.units_short_of_minimum)} units; minimum order costs ${fmtMoney(card.cost_at_minimum)}</div>`;
+  } else if (card.tier_status === "ok") {
+    const t = card.current_tier;
+    body += `<div>Lands in tier <b>${esc(t.tier_str)}</b> @ ${fmtUnit(t.price)}/u → extended <b>${fmtMoney(card.extended_cost)}</b>` +
+            (card.pricing_year ? ` <span class="muted">(${card.pricing_year} pricing)</span>` : "") + `</div>`;
+    const n = card.next_tier;
+    if (n) {
+      body += `<div>Next tier <b>${esc(n.tier.tier_str)}</b> @ ${fmtUnit(n.tier.price)}/u: ` +
+        `order <b>${fmtQty(n.units_short)}</b> more → saves ${fmtUnit(n.savings_per_unit)}/u = ` +
+        `<b>${fmtMoney(n.savings_on_full_order)}</b> on the full order; ` +
+        `incremental units cost ${fmtMoney(n.incremental_units_cost_at_next_price)} at the new price ` +
+        `(${fmtMoney(n.incremental_units_cost_at_current_price)} at current); ` +
+        `incremental spend <b>${fmtMoney(n.incremental_spend)}</b>; total at next tier ${fmtMoney(n.total_cost_at_next_tier)} ` +
+        (n.recommended ? `<span class="reco">BUMP UP RECOMMENDED</span>` : `<span class="stay">stay — human decides</span>`) + `</div>`;
+    } else {
+      body += `<div class="muted">already at the top tier</div>`;
+    }
+    if (card.incomplete_reasons) body += `<div class="muted">note: some tier rows incomplete (${esc(card.incomplete_reasons.join("; "))})</div>`;
+  }
+  if (card.ladder_note) body += `<div class="muted">${esc(card.ladder_note)}</div>`;
+
+  body += `<details><summary class="muted">consolidated messages (${card.consolidated_messages.length})` +
+          (card.beyond_horizon_messages.length ? ` · ${card.beyond_horizon_messages.length} beyond horizon` : "") + `</summary>` +
+          `<table class="trace"><tr><th>Typ</th><th>Request</th><th>Eff. deadline</th><th class="num">Qty</th><th>Sheet row</th></tr>` +
+          card.consolidated_messages.map((m) =>
+            `<tr><td>${esc(m.msg_typ)}</td><td>${m.request_date || ""}</td><td>${m.effective_deadline || ""}</td>` +
+            `<td class="num">${fmtQty(m.qty)}</td><td>${m.row_id}</td></tr>`).join("") +
+          (card.beyond_horizon_messages.length ?
+            card.beyond_horizon_messages.map((m) =>
+              `<tr class="muted"><td>${esc(m.msg_typ)} (beyond horizon)</td><td>${m.request_date || ""}</td>` +
+              `<td>${m.effective_deadline || ""}</td><td class="num">${fmtQty(m.qty)}</td><td>${m.row_id}</td></tr>`).join("") : "") +
+          `</table>` +
+          `<div class="muted">sum: ${card.consolidated_messages.map((m) => fmtQty(m.qty)).join(" + ")} = ${fmtQty(card.aggregate_qty)}</div>` +
+          `</details>`;
+  return `<div class="card">${body}</div>`;
+}
+
+function render() {
+  const b = state.board;
+  if (!b) return;
+  const lines = b.lines.filter(visible);
+  const act = lines.filter((l) => l.actionable);
+  const fire = act.filter((l) => modeOf(l).fire_drill)
+    .sort((x, y) => (modeOf(x).slack_days ?? 0) - (modeOf(y).slack_days ?? 0));
+  const fireIds = new Set(fire.map((l) => l.line_id));
+  const yellow = act.filter((l) => modeOf(l).status === "YELLOW" && !fireIds.has(l.line_id));
+  const green = act.filter((l) => modeOf(l).status === "GREEN" && !fireIds.has(l.line_id));
+  const early = act.filter((l) => modeOf(l).status === "NONE");
+
+  $("#summary").innerHTML =
+    `<span class="pill">snapshot <b>${b.snapshot.snapshot_date}</b> rev ${b.snapshot.revision} · tab ${esc(b.snapshot.source_tab)}</span>` +
+    `<span class="pill">order date: <b>${state.mode === "today" ? "today " + b.today : "snapshot " + b.snapshot.snapshot_date}</b></span>` +
+    `<span class="pill red">fire drill <b>${fire.length}</b></span>` +
+    `<span class="pill yellow">order now <b>${yellow.length}</b></span>` +
+    `<span class="pill green">horizon <b>${green.length}</b></span>` +
+    `<span class="pill">early <b>${early.length}</b></span>` +
+    `<span class="pill">${lines.length}/${b.lines.length} lines shown</span>`;
+
+  $("#fireBody").innerHTML = rowsTable(fire, [["Past due", (l) => {
+    const d = modeOf(l).days_past_due;
+    return d > 0 ? `<b>${d}d late</b>` : (l.msg_typ === "T" ? "past due" : "expedite");
+  }]]);
+
+  // Section 2: supplier groups with tier consolidation cards.
+  const urgent = [...fire, ...yellow];
+  const bySupplier = new Map();
+  for (const l of urgent) {
+    if (!bySupplier.has(l.supplier)) bySupplier.set(l.supplier, []);
+    bySupplier.get(l.supplier).push(l);
+  }
+  let nowHtml = "";
+  for (const [supplier, supplierLines] of bySupplier) {
+    const info = b.suppliers[supplier] || {};
+    const itemSet = new Set(supplierLines.map((l) => l.item_number));
+    const cards = b.tier_cards.filter((c) => c.supplier === String(supplier ?? "") && itemSet.has(c.item_number));
+    const yl = supplierLines.filter((l) => modeOf(l).status === "YELLOW" && !fireIds.has(l.line_id));
+    nowHtml += `<div class="supplier-group"><h3>${esc(supplierLines[0].supplier_name || info.name || supplier)}` +
+      ` <span class="coo">#${esc(supplier)}${info.coo ? " · " + esc(info.coo) : ""}</span></h3>` +
+      `<div class="cards">${cards.map(tierCardHtml).join("")}</div>` +
+      (yl.length ? rowsTable(yl) : `<p class="muted">no yellow-window lines — items above are in the fire drill</p>`) +
+      `</div>`;
+  }
+  $("#nowBody").innerHTML = nowHtml || '<p class="muted">nothing in the order-now window</p>';
+
+  $("#horizonBody").innerHTML = rowsTable(green);
+  $("#horizonCount").textContent = `(${green.length} lines)`;
+
+  // Section 4: diff.
+  const d = b.diff;
+  if (!d) {
+    $("#diffBody").innerHTML = '<p class="muted">no earlier snapshot to compare against</p>';
+  } else {
+    const counts = { NEW: 0, RESOLVED: 0, CHANGED: 0 };
+    d.rows.forEach((r) => counts[r.kind]++);
+    $("#diffBody").innerHTML =
+      `<p>vs <b>${d.prev_snapshot_date}</b>: <span class="kind-NEW">${counts.NEW} new</span> · ` +
+      `<span class="kind-RESOLVED">${counts.RESOLVED} resolved</span> · ` +
+      `<span class="kind-CHANGED">${counts.CHANGED} changed</span></p>` +
+      `<table><thead><tr><th>Kind</th><th>Item</th><th>Supplier</th><th>Request date</th><th class="num">Qty old → new</th><th>Source line ids</th></tr></thead><tbody>` +
+      d.rows.map((r) =>
+        `<tr><td class="kind-${r.kind}">${r.kind}</td><td>${esc(r.item_number)}</td><td>${esc(r.supplier_name || r.supplier)}</td>` +
+        `<td>${r.request_date || ""}</td><td class="num">${r.kind === "CHANGED" ? fmtQty(r.old_qty) + " → " + fmtQty(r.new_qty) : fmtQty(r.new_qty ?? r.old_qty)}</td>` +
+        `<td class="muted">${[...r.old_line_ids, ...r.new_line_ids].join(", ")}</td></tr>`).join("") +
+      `</tbody></table>`;
+  }
+
+  $("#allBody").innerHTML = rowsTable(lines);
+
+  const warnings = state.warnings || [];
+  $("#warnings").innerHTML = warnings.length
+    ? `<details class="warn"><summary>${warnings.length} parse warning(s) on latest ingest</summary>${warnings.map((w) => `<div>${esc(w)}</div>`).join("")}</details>`
+    : "";
+
+  const sid = b.snapshot.id;
+  $("#exportWorksheet").href = `/api/export/worksheet?snapshot_id=${sid}&mode=${state.mode}`;
+  $("#exportDiff").href = `/api/export/diff?snapshot_id=${sid}`;
+}
+
+async function loadBoard(snapshotId) {
+  const url = snapshotId ? `/api/board?snapshot_id=${snapshotId}` : "/api/board";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  state.board = await res.json();
+  populateSupplierFilter();
+  render();
+}
+
+function populateSupplierFilter() {
+  const sel = $("#supplierSel");
+  const current = sel.value;
+  const seen = new Map();
+  state.board.lines.forEach((l) => { if (l.supplier) seen.set(l.supplier, l.supplier_name || l.supplier); });
+  sel.innerHTML = '<option value="">all</option>' +
+    [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([no, name]) => `<option value="${esc(no)}">${esc(name)}</option>`).join("");
+  sel.value = current;
+}
+
+async function loadUploads() {
+  const rows = await (await fetch("/api/uploads")).json();
+  if (rows.length && rows[0].warnings) state.warnings = rows[0].warnings;
+  $("#uploadsBody").innerHTML = !rows.length ? '<p class="muted">no uploads yet</p>' :
+    `<table><thead><tr><th>#</th><th>When</th><th>File</th><th>Status</th><th>Snapshots</th><th>Rows</th><th>SHA-256</th><th>Archived as</th><th>Warnings</th></tr></thead><tbody>` +
+    rows.map((u) =>
+      `<tr><td>${u.id}</td><td>${esc(u.ts)}</td><td>${esc(u.filename)}</td><td>${esc(u.status)}</td>` +
+      `<td>${(u.snapshot_dates || []).join(", ")}</td>` +
+      `<td>${Object.entries(u.row_counts || {}).map(([d, n]) => `${d}: ${n}`).join("; ")}</td>` +
+      `<td class="muted">${u.sha256.slice(0, 12)}…</td><td class="muted">${esc(u.archive_path || "")}</td>` +
+      `<td>${(u.warnings || []).map(esc).join("<br>") || ""}</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+async function init() {
+  try {
+    const meta = await (await fetch("/api/meta")).json();
+    state.meta = meta;
+    const sel = $("#snapshotSel");
+    sel.innerHTML = meta.snapshots.map((s) =>
+      `<option value="${s.id}">${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
+    sel.onchange = () => loadBoard(sel.value).catch(showError);
+
+    const types = ["O", "B", "T", "F", "A"];
+    $("#msgTypes").innerHTML = types.map((t) =>
+      `<label><input type="checkbox" value="${t}" checked> ${t}</label>`).join("");
+    $("#msgTypes").addEventListener("change", () => {
+      const on = [...document.querySelectorAll("#msgTypes input:checked")].map((c) => c.value);
+      state.filters.msgTypes = new Set(on);
+      render();
+    });
+    state.filters.msgTypes = new Set(types);
+
+    document.querySelectorAll('input[name=mode]').forEach((r) =>
+      r.addEventListener("change", () => { state.mode = r.value; render(); }));
+    $("#supplierSel").addEventListener("change", (e) => { state.filters.supplier = e.target.value; render(); });
+    let timer;
+    $("#searchBox").addEventListener("input", (e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { state.filters.search = e.target.value.trim(); render(); }, 150);
+    });
+
+    await loadUploads();
+    if (meta.snapshots.length) await loadBoard(meta.snapshots[0].id);
+    else showError(new Error("no snapshots ingested yet — run: mrp ingest <file.xlsm>"));
+  } catch (err) { showError(err); }
+}
+function showError(err) { const el = $("#error"); el.hidden = false; el.textContent = err.message; }
+init();
+</script>
+</body>
+</html>
