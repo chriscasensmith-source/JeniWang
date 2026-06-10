@@ -134,13 +134,16 @@ def ingest_file(
     db_path: str | Path = dbmod.DEFAULT_DB_PATH,
     archive_dir: str | Path = DEFAULT_ARCHIVE_DIR,
     force: bool = False,
+    original_filename: str | None = None,
 ) -> IngestResult:
     """Ingest a weekly workbook.
 
     Default: ingest the most recent dated tab (the weekly upload case).
     all_tabs=True: backfill every dated tab. tab="05.29.26": one specific tab.
+    original_filename: logged name when `path` is a temp copy (browser upload).
     """
     path = Path(path)
+    display_name = original_filename or path.name
     conn = dbmod.connect(db_path)
     try:
         sha = file_sha256(path)
@@ -151,7 +154,7 @@ def ingest_file(
         ).fetchone()
         if dup is not None and not force:
             upload_id = _log_upload(
-                conn, filename=path.name, sha256=sha, status="duplicate, skipped",
+                conn, filename=display_name, sha256=sha, status="duplicate, skipped",
                 warnings=[f"identical to upload #{dup['id']}; nothing ingested"],
             )
             conn.commit()
@@ -159,7 +162,7 @@ def ingest_file(
 
         parsed = parse_workbook(path)
         if not parsed.weekly_sheets:
-            raise ValueError(f"{path.name}: no dated weekly tabs found")
+            raise ValueError(f"{display_name}: no dated weekly tabs found")
 
         if all_tabs:
             sheets = parsed.weekly_sheets  # already sorted oldest -> newest
@@ -182,7 +185,7 @@ def ingest_file(
             shutil.copy2(path, archive_path)
 
         upload_id = _log_upload(
-            conn, filename=path.name, sha256=sha, status="ingested",
+            conn, filename=display_name, sha256=sha, status="ingested",
             archive_path=str(archive_path),
         )
         _store_reference_tables(conn, upload_id, parsed)

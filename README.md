@@ -11,26 +11,40 @@ answers, per SKU:
 on one machine: SQLite storage, FastAPI + a single static HTML dashboard, no
 cloud, no auth, no JS frameworks.
 
-## The weekly routine
+## The weekly routine (no terminal needed)
 
-```
 1. Export the MRP messages from JDE into the Excel workbook (.xlsm), as usual.
-2. mrp ingest JW_MRP_2026.xlsm        # ingests the newest dated tab
-3. mrp serve                          # open http://127.0.0.1:8000
+2. Double-click **`Start MRP Dashboard.bat`** (Windows) or
+   **`start-mrp-dashboard.command`** (Mac). The browser opens by itself.
+3. **Drag the .xlsm file anywhere onto the page** (or click
+   "Ingest this week's workbook…"). Done — the new week appears, archived
+   and diffed.
+
+Ingest archives the original file, parses the latest weekly tab, stores every
+line append-only, and computes the week-over-week diff. The dashboard shows
+the fire drill, the order-now list with tier consolidation math, the horizon,
+and the diff. Dropping the same file twice is harmless — duplicates are
+detected by hash and skipped.
+
+The same things work from a terminal if you prefer:
+
+```
+mrp ingest JW_MRP_2026.xlsm           # ingests the newest dated tab
+mrp serve                             # open http://127.0.0.1:8000
 ```
 
-That's it. Ingest archives the original file, parses the latest weekly tab,
-stores every line append-only, and computes the week-over-week diff. The
-dashboard shows the fire drill, the order-now list with tier consolidation
-math, the horizon, and the diff.
+## Install (one time)
 
-## Install
+Install Python 3.11+ from python.org (on Windows, check **"Add python.exe to
+PATH"** in the installer), then double-click the launcher above — it installs
+the tool automatically on first run. Or manually:
 
 ```
-python -m pip install -e .          # Python 3.11+
+python -m pip install -e .
 ```
 
 This installs the `mrp` command (openpyxl, pandas, FastAPI, uvicorn, PyYAML).
+`python -m mrp_assistant …` works as an equivalent to `mrp …`.
 
 ## Commands
 
