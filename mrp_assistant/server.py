@@ -3,21 +3,25 @@ Everything runs offline on localhost; no auth."""
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 from contextlib import closing
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 
 from . import db as dbmod
 from .board import build_board, list_snapshots
 from .config import load_config
 from .export import diff_xlsx, worksheet_xlsx
+from .ingest import DEFAULT_ARCHIVE_DIR, ingest_file
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-def create_app(db_path=dbmod.DEFAULT_DB_PATH, config_path="config.yaml") -> FastAPI:
+def create_app(db_path=dbmod.DEFAULT_DB_PATH, config_path="config.yaml",
+               archive_dir=DEFAULT_ARCHIVE_DIR) -> FastAPI:
     app = FastAPI(title="MRP Ordering Assistant")
 
     def conn():
@@ -43,6 +47,35 @@ def create_app(db_path=dbmod.DEFAULT_DB_PATH, config_path="config.yaml") -> Fast
         if data is None:
             raise HTTPException(404, "no snapshots ingested yet — run: mrp ingest <file.xlsm>")
         return data
+
+    @app.post("/api/ingest")
+    async def api_ingest(file: UploadFile = File(...), all_tabs: bool = False):
+        """Browser upload: drop the weekly .xlsm on the dashboard instead of
+        using the CLI. Same pipeline, same paper trail."""
+        suffix = Path(file.filename or "upload.xlsm").suffix or ".xlsm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = Path(tmp.name)
+        try:
+            result = ingest_file(
+                tmp_path,
+                all_tabs=all_tabs,
+                db_path=db_path,
+                archive_dir=archive_dir,
+                original_filename=file.filename,
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        return {
+            "status": result.status,
+            "upload_id": result.upload_id,
+            "archive_path": result.archive_path,
+            "snapshots": result.snapshots,
+            "skipped_sheets": result.skipped_sheets,
+            "warnings": result.warnings,
+        }
 
     @app.get("/api/uploads")
     def uploads():

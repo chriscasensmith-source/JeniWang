@@ -61,6 +61,16 @@
   .kind-CHANGED { color: #b45309; font-weight: 700; }
   .warn { background: #fff4e5; border: 1px solid #f0c177; padding: 4px 8px; margin: 4px 0; }
   #error { color: var(--red-fg); font-weight: 700; padding: 20px; }
+  header button.btn.primary { background: #2563eb; border-color: #1d4ed8; font-weight: 700; }
+  #dropOverlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(31,41,55,.85);
+    color: #fff; font-size: 22px; font-weight: 700; align-items: center; justify-content: center;
+    border: 4px dashed #9ca3af; }
+  #dropOverlay.active { display: flex; }
+  #ingestBanner { margin: 6px 10px 0; padding: 8px 12px; border-radius: 4px; font-size: 12.5px; }
+  #ingestBanner.ok { background: var(--green-bg); border: 1px solid #b7d8bd; color: var(--green-fg); }
+  #ingestBanner.dup { background: var(--yellow-bg); border: 1px solid #e3cf6c; color: var(--yellow-fg); }
+  #ingestBanner.err { background: var(--red-bg); border: 1px solid #e5a3a3; color: var(--red-fg); }
+  #ingestBanner.busy { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; }
 </style>
 </head>
 <body>
@@ -74,7 +84,11 @@
   <label>Search <input type="search" id="searchBox" placeholder="item / description"></label>
   <a class="btn" id="exportWorksheet" href="#">⬇ worksheet.xlsx</a>
   <a class="btn" id="exportDiff" href="#">⬇ diff.xlsx</a>
+  <button class="btn primary" id="ingestBtn">⬆ Ingest this week's workbook…</button>
+  <input type="file" id="ingestFile" accept=".xlsm,.xlsx" hidden>
 </header>
+<div id="dropOverlay">Drop the weekly workbook (.xlsm) to ingest it</div>
+<div id="ingestBanner" hidden></div>
 <main>
   <div id="error" hidden></div>
   <div class="summary" id="summary"></div>
@@ -370,7 +384,74 @@ async function loadUploads() {
     `</tbody></table>`;
 }
 
+function banner(cls, html) {
+  const el = $("#ingestBanner");
+  el.hidden = false;
+  el.className = cls;
+  el.innerHTML = html;
+}
+
+async function ingestWorkbook(file) {
+  if (!file) return;
+  if (!/\.(xlsm|xlsx)$/i.test(file.name)) {
+    banner("err", `“${esc(file.name)}” is not an Excel workbook (.xlsm) — nothing ingested.`);
+    return;
+  }
+  banner("busy", `Ingesting <b>${esc(file.name)}</b>… (this takes a few seconds)`);
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/ingest", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    if (data.status === "duplicate, skipped") {
+      banner("dup", `<b>${esc(file.name)}</b>: identical file was already ingested — nothing changed. ` +
+                    `(That's the duplicate protection working; it can't double-count.)`);
+    } else {
+      const snaps = data.snapshots.map((s) => `${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.row_count} rows)`).join(", ");
+      const skipped = data.skipped_sheets.length ? ` Unchanged tabs skipped: ${data.skipped_sheets.join(", ")}.` : "";
+      const warn = data.warnings.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer">${data.warnings.length} warning(s)</summary>${data.warnings.map(esc).join("<br>")}</details>` : "";
+      banner("ok", `✔ Ingested <b>${esc(file.name)}</b> → snapshot ${snaps || "(no new tabs)"}. ` +
+                   `Original archived.${skipped}${warn}`);
+    }
+    // Refresh everything so the new week shows up selected.
+    const meta = await (await fetch("/api/meta")).json();
+    state.meta = meta;
+    const sel = $("#snapshotSel");
+    sel.innerHTML = meta.snapshots.map((s) =>
+      `<option value="${s.id}">${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
+    await loadUploads();
+    if (meta.snapshots.length) {
+      $("#error").hidden = true;
+      await loadBoard(meta.snapshots[0].id);
+    }
+  } catch (err) {
+    banner("err", `Ingest failed: ${esc(err.message)}`);
+  }
+}
+
+function setupIngestUI() {
+  $("#ingestBtn").addEventListener("click", () => $("#ingestFile").click());
+  $("#ingestFile").addEventListener("change", (e) => {
+    ingestWorkbook(e.target.files[0]);
+    e.target.value = "";
+  });
+  // Drag the .xlsm anywhere onto the page.
+  let dragDepth = 0;
+  const overlay = $("#dropOverlay");
+  document.addEventListener("dragenter", (e) => { e.preventDefault(); if (++dragDepth) overlay.classList.add("active"); });
+  document.addEventListener("dragleave", (e) => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; overlay.classList.remove("active"); } });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.classList.remove("active");
+    ingestWorkbook(e.dataTransfer.files[0]);
+  });
+}
+
 async function init() {
+  setupIngestUI();
   try {
     const meta = await (await fetch("/api/meta")).json();
     state.meta = meta;
@@ -400,7 +481,7 @@ async function init() {
 
     await loadUploads();
     if (meta.snapshots.length) await loadBoard(meta.snapshots[0].id);
-    else showError(new Error("no snapshots ingested yet — run: mrp ingest <file.xlsm>"));
+    else showError(new Error("No data yet — click “Ingest this week's workbook…” above, or drop the .xlsm anywhere on this page."));
   } catch (err) { showError(err); }
 }
 function showError(err) { const el = $("#error"); el.hidden = false; el.textContent = err.message; }
