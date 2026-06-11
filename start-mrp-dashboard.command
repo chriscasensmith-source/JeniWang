@@ -10,7 +10,10 @@ if ! command -v python3 >/dev/null; then
     exit 1
 fi
 
-if ! python3 -c "import mrp_assistant" >/dev/null 2>&1; then
+# Check the actual dependencies, not the package itself: running from the
+# project folder makes "import mrp_assistant" succeed even when nothing
+# was ever installed.
+if ! python3 -c "import yaml, fastapi, uvicorn, openpyxl, pandas, multipart" >/dev/null 2>&1; then
     echo "First-time setup: installing the MRP Ordering Assistant..."
     python3 -m pip install -e . || { read -r -p "Install failed. Press Enter to close."; exit 1; }
 fi

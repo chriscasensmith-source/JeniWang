@@ -27,7 +27,10 @@ if not defined PY (
     exit /b 1
 )
 
-%PY% -c "import mrp_assistant" >nul 2>nul
+rem Check the actual dependencies, not the package itself: running from the
+rem project folder makes "import mrp_assistant" succeed even when nothing
+rem was ever installed.
+%PY% -c "import yaml, fastapi, uvicorn, openpyxl, pandas, multipart" >nul 2>nul
 if errorlevel 1 (
     echo First-time setup: installing the MRP Ordering Assistant...
     echo This happens only once and takes a minute or two.
@@ -35,6 +38,13 @@ if errorlevel 1 (
         echo.
         echo  Install failed - see the messages above.
         echo  Take a screenshot of this window if you need help.
+        echo.
+        pause
+        exit /b 1
+    )
+    %PY% -c "import yaml, fastapi, uvicorn, openpyxl, pandas, multipart" || (
+        echo.
+        echo  Something is still missing after the install - see above.
         echo.
         pause
         exit /b 1
