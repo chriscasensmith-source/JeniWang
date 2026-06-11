@@ -15,31 +15,48 @@
   header { position: sticky; top: 0; z-index: 10; background: #1f2937; color: #eee; padding: 6px 10px;
            display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   header h1 { font-size: 14px; margin: 0 8px 0 0; white-space: nowrap; }
-  header label { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+  header label { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
   header select, header input[type=search] { font-size: 12px; padding: 2px 4px; }
-  header .msgtypes label { margin-right: 6px; }
+  .msgtypes { display: inline-flex; gap: 2px; }
+  .msgtypes label { background: #374151; border: 1px solid #555; border-radius: 3px; padding: 1px 7px; cursor: pointer; user-select: none; }
+  .msgtypes label:has(input:checked) { background: #2563eb; border-color: #1d4ed8; }
+  .msgtypes input { display: none; }
   header a.btn, header button.btn { background: #374151; color: #eee; border: 1px solid #555;
     border-radius: 3px; padding: 2px 8px; font-size: 11px; text-decoration: none; cursor: pointer; }
-  main { padding: 8px 10px 60px; max-width: 1500px; margin: 0 auto; }
-  .summary { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 12px; }
+  header button.btn.primary { background: #2563eb; border-color: #1d4ed8; font-weight: 700; }
+  main { padding: 8px 10px 60px; max-width: 1600px; margin: 0 auto; }
+  .summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; font-size: 12px; align-items: center; }
   .summary b { font-size: 15px; }
   .pill { padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); background: #fff; }
   .pill.red { background: var(--red-bg); color: var(--red-fg); }
   .pill.yellow { background: var(--yellow-bg); color: var(--yellow-fg); }
   .pill.green { background: var(--green-bg); color: var(--green-fg); }
+  .pill.filters { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; cursor: pointer; }
   section { margin-bottom: 16px; }
-  section > h2 { font-size: 13px; margin: 10px 0 4px; border-bottom: 2px solid #1f2937; padding-bottom: 2px; }
+  section > h2, details > summary h2 { font-size: 13px; margin: 10px 0 4px; border-bottom: 2px solid #1f2937; padding-bottom: 2px; }
   table { border-collapse: collapse; width: 100%; background: #fff; }
   th, td { border: 1px solid var(--border); padding: 2px 5px; text-align: left; white-space: nowrap; }
   td.num, th.num { text-align: right; }
-  thead th { background: #eef0f3; position: sticky; top: 34px; }
+  thead th { background: #eef0f3; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { background: #dde3ea; }
+  th .arrow { color: #2563eb; }
+  tr.cfrow th { padding: 1px 2px; background: #f7f8fa; }
+  tr.cfrow input, tr.cfrow select { width: 100%; min-width: 36px; font-size: 11px; padding: 1px 3px;
+    border: 1px solid #ccc; border-radius: 2px; }
   tr.row { cursor: pointer; }
   tr.RED td { background: var(--red-bg); }
   tr.RED td.slack { color: var(--red-fg); font-weight: 700; }
   tr.YELLOW td { background: var(--yellow-bg); }
   tr.YELLOW td.slack { color: var(--yellow-fg); font-weight: 700; }
   tr.GREEN td { background: var(--green-bg); }
-  tr.detail td { background: #f4f6fa; font-family: ui-monospace, Consolas, monospace; font-size: 11px; white-space: normal; }
+  tr.ordered td { opacity: .5; }
+  tr.ordered td.itemcell { text-decoration: line-through; }
+  tr.detail td { background: #f4f6fa; font-size: 11px; white-space: normal; }
+  tr.detail .inputs { font-family: ui-monospace, Consolas, monospace; }
+  .badge { display: inline-block; border-radius: 3px; padding: 0 4px; font-size: 10px; font-weight: 700; }
+  .badge.NEW { background: #dbeafe; color: #1d4ed8; }
+  .badge.CHANGED { background: #fef3c7; color: #b45309; }
   .desc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
   details { margin: 4px 0; }
   details > summary { cursor: pointer; font-weight: 600; padding: 3px 0; }
@@ -55,13 +72,14 @@
   .card .stay { display: inline-block; background: #f1f1f1; border: 1px solid var(--border); border-radius: 3px; padding: 0 6px; }
   .card table { font-size: 11px; margin-top: 4px; }
   .card .trace td { background: #fff; }
+  .hist table { margin-top: 3px; }
+  .hist td, .hist th { font-size: 11px; }
   .muted { color: var(--muted); }
   .kind-NEW { color: #1d4ed8; font-weight: 700; }
   .kind-RESOLVED { color: #2f6f3e; font-weight: 700; }
   .kind-CHANGED { color: #b45309; font-weight: 700; }
   .warn { background: #fff4e5; border: 1px solid #f0c177; padding: 4px 8px; margin: 4px 0; }
   #error { color: var(--red-fg); font-weight: 700; padding: 20px; }
-  header button.btn.primary { background: #2563eb; border-color: #1d4ed8; font-weight: 700; }
   #dropOverlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(31,41,55,.85);
     color: #fff; font-size: 22px; font-weight: 700; align-items: center; justify-content: center;
     border: 4px dashed #9ca3af; }
@@ -77,10 +95,11 @@
 <header>
   <h1>MRP Ordering Assistant</h1>
   <label>Snapshot <select id="snapshotSel"></select></label>
-  <label><input type="radio" name="mode" value="snapshot" checked> as of snapshot</label>
-  <label><input type="radio" name="mode" value="today"> as of today</label>
+  <label title="Compute arrival dates from the JDE pull date of this snapshot"><input type="radio" name="mode" value="snapshot" checked> as of snapshot</label>
+  <label title="Compute arrival dates as if the order is placed today"><input type="radio" name="mode" value="today"> as of today</label>
   <label>Supplier <select id="supplierSel"><option value="">all</option></select></label>
-  <span class="msgtypes" id="msgTypes"></span>
+  <span class="msgtypes" id="msgTypes" title="Message types: O order, B expedite, T past due, F firm, A warning-only"></span>
+  <label title="Hide lines you've ticked as ordered"><input type="checkbox" id="hideOrdered"> hide ordered</label>
   <label>Search <input type="search" id="searchBox" placeholder="item / description"></label>
   <a class="btn" id="exportWorksheet" href="#">⬇ worksheet.xlsx</a>
   <a class="btn" id="exportDiff" href="#">⬇ diff.xlsx</a>
@@ -105,7 +124,7 @@
   </section>
 
   <section id="sec-horizon">
-    <details><summary><h2 style="display:inline">3 · Horizon — coming up soon</h2> <span class="muted" id="horizonCount"></span></summary>
+    <details id="horizonDetails"><summary><h2 style="display:inline">3 · Horizon — coming up soon</h2> <span class="muted" id="horizonCount"></span></summary>
     <div id="horizonBody"></div></details>
   </section>
 
@@ -115,7 +134,7 @@
   </section>
 
   <section>
-    <details><summary>All parsed lines (full worksheet view)</summary><div id="allBody"></div></details>
+    <details id="allDetails"><summary>All parsed lines (full worksheet view)</summary><div id="allBody"></div></details>
   </section>
 
   <section>
@@ -126,47 +145,37 @@
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
-const state = { meta: null, board: null, mode: "snapshot",
-                filters: { supplier: "", search: "", msgTypes: null } };
+const state = {
+  meta: null, board: null, mode: "snapshot",
+  filters: { supplier: "", search: "", msgTypes: null, hideOrdered: false },
+  colFilters: {},          // column key -> filter string
+  sort: {},                // section id -> {key, dir}
+  diffKinds: {},           // item|supplier|request_date -> NEW / CHANGED
+  histCache: {},
+};
+const MSG_TYPES = ["O", "B", "T", "F", "A"];
 
 const fmtQty = (n) => n == null ? "" : Number(n).toLocaleString("en-US", { maximumFractionDigits: 1 });
 const fmtMoney = (n) => n == null ? "" : "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtUnit = (n) => n == null ? "" : "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 5 });
+const fmtDate = (iso) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${m}/${d}/${y.slice(2)}`;   // US format: MM/DD/YY
+};
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 function modeOf(line) { return line[state.mode]; }
-
-function visible(line) {
-  const f = state.filters;
-  if (f.supplier && line.supplier !== f.supplier) return false;
-  if (f.msgTypes && !f.msgTypes.has(line.msg_typ)) return false;
-  if (f.search) {
-    const hay = `${line.item_number} ${line.description || ""}`.toLowerCase();
-    if (!hay.includes(f.search.toLowerCase())) return false;
-  }
-  return true;
-}
-
-const COLS = [
-  ["Typ", (l) => l.msg_typ],
-  ["Item", (l) => l.item_number],
-  ["Description", (l) => `<span class="desc">${esc(l.description)}</span>`],
-  ["Supplier", (l) => esc(l.supplier_name)],
-  ["Qty", (l) => fmtQty(l.required_qty), "num"],
-  ["Request", (l) => l.request_date || ""],
-  ["Eff. deadline", (l) => l.effective_deadline || ""],
-  ["ORDER BY", (l) => `<b>${l.last_safe_order_date || ""}</b>`],
-  ["Arrives (dock)", (l) => modeOf(l).projected_dock_date || ""],
-  ["Slack", (l) => slackText(l), "num slack"],
-  ["Status", (l) => statusText(l)],
-];
+function markKey(l) { return `${l.item_number}|${l.supplier || ""}|${l.request_date || ""}`; }
 
 function slackText(l) {
   const s = modeOf(l).slack_days;
   if (s == null) return "";
   return s < 0 ? `${s} (late ${-s}d)` : `+${s}`;
 }
-function statusText(l) {
+const STATUS_LABEL = { RED: "LATE", YELLOW: "ORDER NOW", GREEN: "soon", NONE: "early", info: "info" };
+function statusRaw(l) { return l.actionable ? (modeOf(l).status || "") : "info"; }
+function statusHtml(l) {
   const m = modeOf(l);
   if (!l.actionable) return `<span class="muted">${l.msg_typ === "A" ? "warning-only" : "firm"}</span>`;
   if (m.status === "RED") return "LATE";
@@ -175,38 +184,242 @@ function statusText(l) {
   if (m.status === "NONE") return `<span class="muted">early by ${m.early_by_days}d</span>`;
   return "";
 }
+function deltaBadge(l) {
+  const kind = state.diffKinds[markKey(l)];
+  if (kind === "NEW") return `<span class="badge NEW" title="Not present last week">NEW</span>`;
+  if (kind === "CHANGED") return `<span class="badge CHANGED" title="Quantity moved since last week — see section 4">CHG</span>`;
+  return "";
+}
 
-function rowsTable(lines, extraCols = []) {
+// Column model: key, label, tooltip, css class, filter type, raw value, html.
+const COLS = [
+  { key: "ordered", label: "✓", tip: "Tick when the PO is placed; carries over week to week", cls: "", ftype: "none",
+    raw: (l) => l.ordered ? 1 : 0,
+    html: (l) => l.actionable ? `<input type="checkbox" class="mark-chk" data-line="${l.line_id}" ${l.ordered ? "checked" : ""}>` : "" },
+  { key: "delta", label: "Δ", tip: "Change vs last week: NEW or CHanGed (see section 4)", cls: "", ftype: "none",
+    raw: (l) => state.diffKinds[markKey(l)] || "", html: deltaBadge },
+  { key: "msg_typ", label: "Typ", tip: "JDE message type: O order, B expedite, T past due, F firm, A warning-only", cls: "", ftype: "select",
+    raw: (l) => l.msg_typ, html: (l) => l.msg_typ },
+  { key: "item_number", label: "Item", tip: "Item number (click row for full detail + history)", cls: "itemcell", ftype: "text",
+    raw: (l) => l.item_number, html: (l) => l.item_number },
+  { key: "description", label: "Description", tip: "", cls: "", ftype: "text",
+    raw: (l) => l.description || "", html: (l) => `<span class="desc">${esc(l.description)}</span>` },
+  { key: "supplier_name", label: "Supplier", tip: "", cls: "", ftype: "text",
+    raw: (l) => l.supplier_name || "", html: (l) => esc(l.supplier_name) },
+  { key: "required_qty", label: "Qty", tip: "Required quantity. Filter: >100, <0, 5..20, =500", cls: "num", ftype: "num",
+    raw: (l) => l.required_qty, html: (l) => fmtQty(l.required_qty) },
+  { key: "request_date", label: "Request", tip: "JDE Request Date", cls: "", ftype: "text",
+    raw: (l) => fmtDate(l.request_date), html: (l) => fmtDate(l.request_date) },
+  { key: "effective_deadline", label: "Eff. deadline", tip: "Request Date minus QA Days — the date the goods must hit the dock", cls: "", ftype: "text",
+    raw: (l) => fmtDate(l.effective_deadline), html: (l) => fmtDate(l.effective_deadline) },
+  { key: "last_safe_order_date", label: "ORDER BY", tip: "Effective deadline minus lead time — order on or before this date", cls: "", ftype: "text",
+    raw: (l) => fmtDate(l.last_safe_order_date), html: (l) => `<b>${fmtDate(l.last_safe_order_date)}</b>` },
+  { key: "dock", label: "Arrives (dock)", tip: "Order date + lead time", cls: "", ftype: "text",
+    raw: (l) => fmtDate(modeOf(l).projected_dock_date), html: (l) => fmtDate(modeOf(l).projected_dock_date) },
+  { key: "slack", label: "Slack", tip: "Effective deadline minus arrival. Negative = late. Filter: <0, >30, -10..10", cls: "num slack", ftype: "num",
+    raw: (l) => modeOf(l).slack_days, html: slackText },
+  { key: "status", label: "Status", tip: "RED late / YELLOW order now / GREEN soon / early", cls: "", ftype: "select",
+    raw: statusRaw, html: statusHtml },
+];
+
+// ---------- filtering ----------
+function numPass(expr, v) {
+  expr = expr.trim();
+  if (!expr) return true;
+  if (v == null) return false;
+  let m;
+  if ((m = expr.match(/^(>=|<=|>|<|=)\s*(-?\d+\.?\d*)$/))) {
+    const n = +m[2];
+    return m[1] === ">" ? v > n : m[1] === "<" ? v < n :
+           m[1] === ">=" ? v >= n : m[1] === "<=" ? v <= n : v === n;
+  }
+  if ((m = expr.match(/^(-?\d+\.?\d*)\s*\.\.\s*(-?\d+\.?\d*)$/))) return v >= +m[1] && v <= +m[2];
+  if (/^-?\d+\.?\d*$/.test(expr)) return v === +expr;
+  return true;
+}
+
+function passesColFilters(l) {
+  for (const c of COLS) {
+    const f = state.colFilters[c.key];
+    if (!f) continue;
+    const v = c.raw(l);
+    if (c.ftype === "num") { if (!numPass(f, v)) return false; }
+    else if (c.ftype === "select") { if (String(v) !== f) return false; }
+    else if (!String(v ?? "").toLowerCase().includes(f.toLowerCase())) return false;
+  }
+  return true;
+}
+
+function visible(line) {
+  const f = state.filters;
+  if (f.supplier && line.supplier !== f.supplier) return false;
+  if (f.msgTypes && !f.msgTypes.has(line.msg_typ)) return false;
+  if (f.hideOrdered && line.ordered) return false;
+  if (f.search) {
+    const hay = `${line.item_number} ${line.description || ""}`.toLowerCase();
+    if (!hay.includes(f.search.toLowerCase())) return false;
+  }
+  return passesColFilters(line);
+}
+
+function activeFilterCount() {
+  const f = state.filters;
+  let n = Object.values(state.colFilters).filter(Boolean).length;
+  if (f.supplier) n++;
+  if (f.search) n++;
+  if (f.hideOrdered) n++;
+  if (f.msgTypes && f.msgTypes.size < MSG_TYPES.length) n++;
+  return n;
+}
+
+function clearFilters() {
+  state.colFilters = {};
+  state.filters.supplier = "";
+  state.filters.search = "";
+  state.filters.hideOrdered = false;
+  state.filters.msgTypes = new Set(MSG_TYPES);
+  $("#supplierSel").value = "";
+  $("#searchBox").value = "";
+  $("#hideOrdered").checked = false;
+  document.querySelectorAll("#msgTypes input").forEach((c) => { c.checked = true; });
+  save(); render();
+}
+
+// ---------- persistence ----------
+function save() {
+  try {
+    localStorage.setItem("mrpState", JSON.stringify({
+      mode: state.mode,
+      supplier: state.filters.supplier,
+      search: state.filters.search,
+      hideOrdered: state.filters.hideOrdered,
+      msgTypes: [...(state.filters.msgTypes || MSG_TYPES)],
+      colFilters: state.colFilters,
+      sort: state.sort,
+    }));
+  } catch (e) { /* private browsing etc. — non-fatal */ }
+}
+function restore() {
+  try {
+    const s = JSON.parse(localStorage.getItem("mrpState") || "{}");
+    if (s.mode) state.mode = s.mode;
+    state.filters.supplier = s.supplier || "";
+    state.filters.search = s.search || "";
+    state.filters.hideOrdered = !!s.hideOrdered;
+    state.filters.msgTypes = new Set(s.msgTypes || MSG_TYPES);
+    state.colFilters = s.colFilters || {};
+    state.sort = s.sort || {};
+  } catch (e) { state.filters.msgTypes = new Set(MSG_TYPES); }
+}
+
+// ---------- sorting ----------
+const DEFAULT_SORT = {
+  fire: { key: "slack", dir: 1 }, now: { key: "slack", dir: 1 },
+  horizon: { key: "slack", dir: 1 }, all: { key: "__row", dir: 1 },
+};
+function sortLines(section, lines) {
+  const s = state.sort[section] || DEFAULT_SORT[section] || { key: "__row", dir: 1 };
+  const col = COLS.find((c) => c.key === s.key);
+  const get = s.key === "__row" ? (l) => l.row_id : (col ? col.raw : (l) => l.row_id);
+  return [...lines].sort((a, b) => {
+    const va = get(a), vb = get(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const cmp = typeof va === "number" && typeof vb === "number"
+      ? va - vb : String(va).localeCompare(String(vb));
+    return cmp * s.dir;
+  });
+}
+
+// ---------- tables ----------
+function selectOptions(colKey, lines) {
+  const col = COLS.find((c) => c.key === colKey);
+  const vals = [...new Set(lines.map((l) => String(col.raw(l) ?? "")))].filter(Boolean).sort();
+  return vals;
+}
+
+function rowsTable(section, lines, allLines) {
   if (!lines.length) return '<p class="muted">none</p>';
-  const cols = [...extraCols, ...COLS];
-  let html = "<table><thead><tr>" + cols.map(([h, , cls]) => `<th class="${cls || ""}">${h}</th>`).join("") + "</tr></thead><tbody>";
-  for (const l of lines) {
-    const cls = l.actionable ? (modeOf(l).status || "") : "";
+  const sort = state.sort[section] || DEFAULT_SORT[section];
+  let html = `<table data-section="${section}"><thead><tr>` +
+    COLS.map((c) => {
+      const arrow = sort && sort.key === c.key ? `<span class="arrow">${sort.dir > 0 ? " ▲" : " ▼"}</span>` : "";
+      return `<th class="sortable ${c.cls}" data-section="${section}" data-key="${c.key}" title="${esc(c.tip)}">${c.label}${arrow}</th>`;
+    }).join("") + "</tr><tr class='cfrow'>" +
+    COLS.map((c) => {
+      const id = `cf_${section}_${c.key}`;
+      const val = state.colFilters[c.key] || "";
+      if (c.ftype === "none") return "<th></th>";
+      if (c.ftype === "select") {
+        const opts = selectOptions(c.key, allLines)
+          .map((v) => `<option value="${esc(v)}" ${v === val ? "selected" : ""}>${esc(c.key === "status" ? (STATUS_LABEL[v] || v) : v)}</option>`).join("");
+        return `<th><select id="${id}" class="colfilter" data-key="${c.key}"><option value="">all</option>${opts}</select></th>`;
+      }
+      const ph = c.ftype === "num" ? ">n <n a..b" : "filter";
+      return `<th><input id="${id}" class="colfilter" data-key="${c.key}" value="${esc(val)}" placeholder="${ph}"></th>`;
+    }).join("") + "</tr></thead><tbody>";
+  for (const l of sortLines(section, lines)) {
+    const cls = (l.actionable ? (modeOf(l).status || "") : "") + (l.ordered ? " ordered" : "");
     html += `<tr class="row ${cls}" data-line="${l.line_id}">` +
-      cols.map(([, get, cls2]) => `<td class="${cls2 || ""}">${get(l) ?? ""}</td>`).join("") + "</tr>";
+      COLS.map((c) => `<td class="${c.cls}">${c.html(l) ?? ""}</td>`).join("") + "</tr>";
   }
   return html + "</tbody></table>";
 }
 
+// ---------- row detail + item history ----------
 function detailRow(l) {
   const m = modeOf(l);
   const fields = [
     ["msg type", l.msg_typ], ["or ty", l.or_ty], ["message", l.message],
     ["order number", l.order_number], ["demand branch", l.demand_branch],
     ["lead time", l.lead_time + " days"], ["QA days", l.qa_days],
-    ["request date", l.request_date],
-    ["effective deadline (request − QA)", l.effective_deadline],
-    ["last safe order date (deadline − lead)", l.last_safe_order_date],
-    ["order date used", m.order_date],
-    ["projected dock (order + lead)", m.projected_dock_date],
-    ["projected arrival incl. QA", m.projected_arrival_with_qa],
+    ["request date", fmtDate(l.request_date)],
+    ["effective deadline (request − QA)", fmtDate(l.effective_deadline)],
+    ["last safe order date (deadline − lead)", fmtDate(l.last_safe_order_date)],
+    ["order date used", fmtDate(m.order_date)],
+    ["projected dock (order + lead)", fmtDate(m.projected_dock_date)],
+    ["projected arrival incl. QA", fmtDate(m.projected_arrival_with_qa)],
     ["slack days (deadline − dock)", m.slack_days],
     ["source: sheet row", l.row_id], ["db line id", l.line_id],
   ];
-  return fields.map(([k, v]) => `<b>${k}:</b> ${esc(v)}`).join(" &nbsp;·&nbsp; ");
+  return `<div class="inputs">${fields.map(([k, v]) => `<b>${k}:</b> ${esc(v)}`).join(" &nbsp;·&nbsp; ")}</div>` +
+         `<div class="hist" id="hist_${l.line_id}"><span class="muted">loading history…</span></div>`;
+}
+
+async function loadHistory(l) {
+  const el = document.getElementById(`hist_${l.line_id}`);
+  if (!el) return;
+  const cacheKey = `${l.item_number}|${l.supplier || ""}`;
+  try {
+    if (!state.histCache[cacheKey]) {
+      const url = `/api/item_history?item_number=${encodeURIComponent(l.item_number)}` +
+                  (l.supplier ? `&supplier=${encodeURIComponent(l.supplier)}` : "");
+      state.histCache[cacheKey] = await (await fetch(url)).json();
+    }
+    const weeks = state.histCache[cacheKey];
+    if (!weeks.length) { el.innerHTML = '<span class="muted">no history</span>'; return; }
+    el.innerHTML = `<b>Item ${esc(l.item_number)} across ${weeks.length} stored week(s):</b>` +
+      `<table><tr><th>Week (snapshot)</th><th class="num">Total qty</th><th>Messages (qty @ request date)</th></tr>` +
+      weeks.map((w) => {
+        const msgs = w.messages.map((msg) => `${fmtQty(msg.qty)} @ ${fmtDate(msg.request_date)} (${esc(msg.msg_typ)})`).join("; ");
+        return `<tr><td>${fmtDate(w.snapshot_date)}${w.revision > 1 ? " rev " + w.revision : ""}</td>` +
+               `<td class="num">${fmtQty(w.total_qty)}</td><td>${msgs}</td></tr>`;
+      }).join("") + `</table>`;
+  } catch (err) { el.innerHTML = `<span class="muted">history unavailable: ${esc(err.message)}</span>`; }
 }
 
 document.addEventListener("click", (e) => {
+  // Sort on header click.
+  const th = e.target.closest("th.sortable");
+  if (th) {
+    const section = th.dataset.section, key = th.dataset.key;
+    const cur = state.sort[section] || DEFAULT_SORT[section];
+    state.sort[section] = { key, dir: cur && cur.key === key ? -cur.dir : 1 };
+    save(); render();
+    return;
+  }
+  if (e.target.classList.contains("mark-chk") || e.target.closest(".cfrow")) return;
   const tr = e.target.closest("tr.row");
   if (!tr) return;
   const next = tr.nextElementSibling;
@@ -217,13 +430,52 @@ document.addEventListener("click", (e) => {
   dr.className = "detail";
   dr.innerHTML = `<td colspan="${tr.children.length}">${detailRow(line)}</td>`;
   tr.after(dr);
+  loadHistory(line);
 });
 
+document.addEventListener("change", async (e) => {
+  if (e.target.classList.contains("mark-chk")) {
+    const line = state.board.lines.find((l) => l.line_id == e.target.dataset.line);
+    if (!line) return;
+    const marked = e.target.checked;
+    try {
+      const res = await fetch("/api/mark", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_number: line.item_number, supplier: line.supplier,
+          request_date: line.request_date, marked,
+        }),
+      });
+      if (!res.ok) throw new Error(res.statusText);
+      const key = markKey(line);
+      state.board.lines.forEach((l) => { if (markKey(l) === key) l.ordered = marked; });
+      render();
+    } catch (err) {
+      e.target.checked = !marked;
+      alert("Could not save the mark: " + err.message);
+    }
+    return;
+  }
+  if (e.target.classList.contains("colfilter")) {
+    state.colFilters[e.target.dataset.key] = e.target.value;
+    save(); render();
+  }
+});
+let cfTimer;
+document.addEventListener("input", (e) => {
+  if (!e.target.classList.contains("colfilter") || e.target.tagName === "SELECT") return;
+  clearTimeout(cfTimer);
+  cfTimer = setTimeout(() => {
+    state.colFilters[e.target.dataset.key] = e.target.value;
+    save(); render();
+  }, 250);
+});
+
+// ---------- tier cards ----------
 function tierCardHtml(card) {
   let body = `<h4>${esc(card.item_number)} <span class="muted">${esc(card.description || "")}</span></h4>`;
   body += `<div>Aggregate <span class="agg">${fmtQty(card.aggregate_qty)}</span> units ` +
           `<span class="muted">(${card.consolidated_messages.length} msgs within ${card.horizon_days}d horizon)</span></div>`;
-
   if (card.tier_status === "no_data") {
     body += `<div class="flag">no tier data — request pricing</div>`;
   } else if (card.tier_status === "incomplete") {
@@ -252,50 +504,54 @@ function tierCardHtml(card) {
     if (card.incomplete_reasons) body += `<div class="muted">note: some tier rows incomplete (${esc(card.incomplete_reasons.join("; "))})</div>`;
   }
   if (card.ladder_note) body += `<div class="muted">${esc(card.ladder_note)}</div>`;
-
   body += `<details><summary class="muted">consolidated messages (${card.consolidated_messages.length})` +
           (card.beyond_horizon_messages.length ? ` · ${card.beyond_horizon_messages.length} beyond horizon` : "") + `</summary>` +
           `<table class="trace"><tr><th>Typ</th><th>Request</th><th>Eff. deadline</th><th class="num">Qty</th><th>Sheet row</th></tr>` +
           card.consolidated_messages.map((m) =>
-            `<tr><td>${esc(m.msg_typ)}</td><td>${m.request_date || ""}</td><td>${m.effective_deadline || ""}</td>` +
+            `<tr><td>${esc(m.msg_typ)}</td><td>${fmtDate(m.request_date)}</td><td>${fmtDate(m.effective_deadline)}</td>` +
             `<td class="num">${fmtQty(m.qty)}</td><td>${m.row_id}</td></tr>`).join("") +
           (card.beyond_horizon_messages.length ?
             card.beyond_horizon_messages.map((m) =>
-              `<tr class="muted"><td>${esc(m.msg_typ)} (beyond horizon)</td><td>${m.request_date || ""}</td>` +
-              `<td>${m.effective_deadline || ""}</td><td class="num">${fmtQty(m.qty)}</td><td>${m.row_id}</td></tr>`).join("") : "") +
+              `<tr class="muted"><td>${esc(m.msg_typ)} (beyond horizon)</td><td>${fmtDate(m.request_date)}</td>` +
+              `<td>${fmtDate(m.effective_deadline)}</td><td class="num">${fmtQty(m.qty)}</td><td>${m.row_id}</td></tr>`).join("") : "") +
           `</table>` +
           `<div class="muted">sum: ${card.consolidated_messages.map((m) => fmtQty(m.qty)).join(" + ")} = ${fmtQty(card.aggregate_qty)}</div>` +
           `</details>`;
   return `<div class="card">${body}</div>`;
 }
 
+// ---------- main render ----------
 function render() {
   const b = state.board;
   if (!b) return;
+  const focused = document.activeElement;
+  const focusId = focused ? focused.id : null;
+  const selPos = focused && focused.setSelectionRange ? focused.selectionStart : null;
+
   const lines = b.lines.filter(visible);
   const act = lines.filter((l) => l.actionable);
-  const fire = act.filter((l) => modeOf(l).fire_drill)
-    .sort((x, y) => (modeOf(x).slack_days ?? 0) - (modeOf(y).slack_days ?? 0));
+  const fire = act.filter((l) => modeOf(l).fire_drill);
   const fireIds = new Set(fire.map((l) => l.line_id));
   const yellow = act.filter((l) => modeOf(l).status === "YELLOW" && !fireIds.has(l.line_id));
   const green = act.filter((l) => modeOf(l).status === "GREEN" && !fireIds.has(l.line_id));
   const early = act.filter((l) => modeOf(l).status === "NONE");
+  const nFilters = activeFilterCount();
 
   $("#summary").innerHTML =
-    `<span class="pill">snapshot <b>${b.snapshot.snapshot_date}</b> rev ${b.snapshot.revision} · tab ${esc(b.snapshot.source_tab)}</span>` +
-    `<span class="pill">order date: <b>${state.mode === "today" ? "today " + b.today : "snapshot " + b.snapshot.snapshot_date}</b></span>` +
+    `<span class="pill">snapshot <b>${fmtDate(b.snapshot.snapshot_date)}</b> rev ${b.snapshot.revision} · tab ${esc(b.snapshot.source_tab)}</span>` +
+    `<span class="pill">order date: <b>${state.mode === "today" ? "today " + fmtDate(b.today) : "snapshot " + fmtDate(b.snapshot.snapshot_date)}</b></span>` +
     `<span class="pill red">fire drill <b>${fire.length}</b></span>` +
     `<span class="pill yellow">order now <b>${yellow.length}</b></span>` +
     `<span class="pill green">horizon <b>${green.length}</b></span>` +
     `<span class="pill">early <b>${early.length}</b></span>` +
-    `<span class="pill">${lines.length}/${b.lines.length} lines shown</span>`;
+    `<span class="pill">${lines.length}/${b.lines.length} lines shown</span>` +
+    (nFilters ? `<span class="pill filters" id="clearFilters" title="Click to clear every filter">` +
+                `${nFilters} filter${nFilters > 1 ? "s" : ""} on · ${b.lines.length - lines.length} rows hidden · ✕ clear</span>` : "");
+  const clearBtn = $("#clearFilters");
+  if (clearBtn) clearBtn.onclick = clearFilters;
 
-  $("#fireBody").innerHTML = rowsTable(fire, [["Past due", (l) => {
-    const d = modeOf(l).days_past_due;
-    return d > 0 ? `<b>${d}d late</b>` : (l.msg_typ === "T" ? "past due" : "expedite");
-  }]]);
+  $("#fireBody").innerHTML = rowsTable("fire", fire, b.lines);
 
-  // Section 2: supplier groups with tier consolidation cards.
   const urgent = [...fire, ...yellow];
   const bySupplier = new Map();
   for (const l of urgent) {
@@ -311,15 +567,14 @@ function render() {
     nowHtml += `<div class="supplier-group"><h3>${esc(supplierLines[0].supplier_name || info.name || supplier)}` +
       ` <span class="coo">#${esc(supplier)}${info.coo ? " · " + esc(info.coo) : ""}</span></h3>` +
       `<div class="cards">${cards.map(tierCardHtml).join("")}</div>` +
-      (yl.length ? rowsTable(yl) : `<p class="muted">no yellow-window lines — items above are in the fire drill</p>`) +
+      (yl.length ? rowsTable("now", yl, b.lines) : `<p class="muted">no yellow-window lines — items above are in the fire drill</p>`) +
       `</div>`;
   }
   $("#nowBody").innerHTML = nowHtml || '<p class="muted">nothing in the order-now window</p>';
 
-  $("#horizonBody").innerHTML = rowsTable(green);
+  $("#horizonBody").innerHTML = rowsTable("horizon", green, b.lines);
   $("#horizonCount").textContent = `(${green.length} lines)`;
 
-  // Section 4: diff.
   const d = b.diff;
   if (!d) {
     $("#diffBody").innerHTML = '<p class="muted">no earlier snapshot to compare against</p>';
@@ -327,18 +582,18 @@ function render() {
     const counts = { NEW: 0, RESOLVED: 0, CHANGED: 0 };
     d.rows.forEach((r) => counts[r.kind]++);
     $("#diffBody").innerHTML =
-      `<p>vs <b>${d.prev_snapshot_date}</b>: <span class="kind-NEW">${counts.NEW} new</span> · ` +
+      `<p>vs <b>${fmtDate(d.prev_snapshot_date)}</b>: <span class="kind-NEW">${counts.NEW} new</span> · ` +
       `<span class="kind-RESOLVED">${counts.RESOLVED} resolved</span> · ` +
       `<span class="kind-CHANGED">${counts.CHANGED} changed</span></p>` +
       `<table><thead><tr><th>Kind</th><th>Item</th><th>Supplier</th><th>Request date</th><th class="num">Qty old → new</th><th>Source line ids</th></tr></thead><tbody>` +
       d.rows.map((r) =>
         `<tr><td class="kind-${r.kind}">${r.kind}</td><td>${esc(r.item_number)}</td><td>${esc(r.supplier_name || r.supplier)}</td>` +
-        `<td>${r.request_date || ""}</td><td class="num">${r.kind === "CHANGED" ? fmtQty(r.old_qty) + " → " + fmtQty(r.new_qty) : fmtQty(r.new_qty ?? r.old_qty)}</td>` +
+        `<td>${fmtDate(r.request_date)}</td><td class="num">${r.kind === "CHANGED" ? fmtQty(r.old_qty) + " → " + fmtQty(r.new_qty) : fmtQty(r.new_qty ?? r.old_qty)}</td>` +
         `<td class="muted">${[...r.old_line_ids, ...r.new_line_ids].join(", ")}</td></tr>`).join("") +
       `</tbody></table>`;
   }
 
-  $("#allBody").innerHTML = rowsTable(lines);
+  $("#allBody").innerHTML = rowsTable("all", lines, b.lines);
 
   const warnings = state.warnings || [];
   $("#warnings").innerHTML = warnings.length
@@ -348,26 +603,44 @@ function render() {
   const sid = b.snapshot.id;
   $("#exportWorksheet").href = `/api/export/worksheet?snapshot_id=${sid}&mode=${state.mode}`;
   $("#exportDiff").href = `/api/export/diff?snapshot_id=${sid}`;
+
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    if (el) {
+      el.focus();
+      if (selPos != null && el.setSelectionRange) el.setSelectionRange(selPos, selPos);
+    }
+  }
 }
 
+// ---------- data loading ----------
 async function loadBoard(snapshotId) {
   const url = snapshotId ? `/api/board?snapshot_id=${snapshotId}` : "/api/board";
   const res = await fetch(url);
   if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
   state.board = await res.json();
+  state.diffKinds = {};
+  if (state.board.diff) {
+    for (const r of state.board.diff.rows) {
+      if (r.kind === "NEW" || r.kind === "CHANGED") {
+        state.diffKinds[`${r.item_number}|${r.supplier || ""}|${r.request_date || ""}`] = r.kind;
+      }
+    }
+  }
   populateSupplierFilter();
   render();
 }
 
 function populateSupplierFilter() {
   const sel = $("#supplierSel");
-  const current = sel.value;
+  const current = state.filters.supplier || sel.value;
   const seen = new Map();
   state.board.lines.forEach((l) => { if (l.supplier) seen.set(l.supplier, l.supplier_name || l.supplier); });
   sel.innerHTML = '<option value="">all</option>' +
     [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
       .map(([no, name]) => `<option value="${esc(no)}">${esc(name)}</option>`).join("");
-  sel.value = current;
+  sel.value = [...seen.keys()].includes(current) ? current : "";
+  state.filters.supplier = sel.value;
 }
 
 async function loadUploads() {
@@ -377,13 +650,14 @@ async function loadUploads() {
     `<table><thead><tr><th>#</th><th>When</th><th>File</th><th>Status</th><th>Snapshots</th><th>Rows</th><th>SHA-256</th><th>Archived as</th><th>Warnings</th></tr></thead><tbody>` +
     rows.map((u) =>
       `<tr><td>${u.id}</td><td>${esc(u.ts)}</td><td>${esc(u.filename)}</td><td>${esc(u.status)}</td>` +
-      `<td>${(u.snapshot_dates || []).join(", ")}</td>` +
-      `<td>${Object.entries(u.row_counts || {}).map(([d, n]) => `${d}: ${n}`).join("; ")}</td>` +
+      `<td>${(u.snapshot_dates || []).map(fmtDate).join(", ")}</td>` +
+      `<td>${Object.entries(u.row_counts || {}).map(([dd, n]) => `${fmtDate(dd)}: ${n}`).join("; ")}</td>` +
       `<td class="muted">${u.sha256.slice(0, 12)}…</td><td class="muted">${esc(u.archive_path || "")}</td>` +
       `<td>${(u.warnings || []).map(esc).join("<br>") || ""}</td></tr>`).join("") +
     `</tbody></table>`;
 }
 
+// ---------- ingest (button + drag-and-drop) ----------
 function banner(cls, html) {
   const el = $("#ingestBanner");
   el.hidden = false;
@@ -408,18 +682,17 @@ async function ingestWorkbook(file) {
       banner("dup", `<b>${esc(file.name)}</b>: identical file was already ingested — nothing changed. ` +
                     `(That's the duplicate protection working; it can't double-count.)`);
     } else {
-      const snaps = data.snapshots.map((s) => `${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.row_count} rows)`).join(", ");
+      const snaps = data.snapshots.map((s) => `${fmtDate(s.snapshot_date)}${s.revision > 1 ? " rev " + s.revision : ""} (${s.row_count} rows)`).join(", ");
       const skipped = data.skipped_sheets.length ? ` Unchanged tabs skipped: ${data.skipped_sheets.join(", ")}.` : "";
       const warn = data.warnings.length ? ` <details style="display:inline"><summary style="display:inline;cursor:pointer">${data.warnings.length} warning(s)</summary>${data.warnings.map(esc).join("<br>")}</details>` : "";
       banner("ok", `✔ Ingested <b>${esc(file.name)}</b> → snapshot ${snaps || "(no new tabs)"}. ` +
                    `Original archived.${skipped}${warn}`);
     }
-    // Refresh everything so the new week shows up selected.
     const meta = await (await fetch("/api/meta")).json();
     state.meta = meta;
     const sel = $("#snapshotSel");
     sel.innerHTML = meta.snapshots.map((s) =>
-      `<option value="${s.id}">${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
+      `<option value="${s.id}">${fmtDate(s.snapshot_date)}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
     await loadUploads();
     if (meta.snapshots.length) {
       $("#error").hidden = true;
@@ -436,7 +709,6 @@ function setupIngestUI() {
     ingestWorkbook(e.target.files[0]);
     e.target.value = "";
   });
-  // Drag the .xlsm anywhere onto the page.
   let dragDepth = 0;
   const overlay = $("#dropOverlay");
   document.addEventListener("dragenter", (e) => { e.preventDefault(); if (++dragDepth) overlay.classList.add("active"); });
@@ -450,33 +722,44 @@ function setupIngestUI() {
   });
 }
 
+// ---------- init ----------
 async function init() {
+  restore();
   setupIngestUI();
   try {
     const meta = await (await fetch("/api/meta")).json();
     state.meta = meta;
     const sel = $("#snapshotSel");
     sel.innerHTML = meta.snapshots.map((s) =>
-      `<option value="${s.id}">${s.snapshot_date}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
+      `<option value="${s.id}">${fmtDate(s.snapshot_date)}${s.revision > 1 ? " rev " + s.revision : ""} (${s.source_tab})</option>`).join("");
     sel.onchange = () => loadBoard(sel.value).catch(showError);
 
-    const types = ["O", "B", "T", "F", "A"];
-    $("#msgTypes").innerHTML = types.map((t) =>
-      `<label><input type="checkbox" value="${t}" checked> ${t}</label>`).join("");
+    $("#msgTypes").innerHTML = MSG_TYPES.map((t) =>
+      `<label><input type="checkbox" value="${t}" ${state.filters.msgTypes.has(t) ? "checked" : ""}> ${t}</label>`).join("");
     $("#msgTypes").addEventListener("change", () => {
       const on = [...document.querySelectorAll("#msgTypes input:checked")].map((c) => c.value);
       state.filters.msgTypes = new Set(on);
-      render();
+      save(); render();
     });
-    state.filters.msgTypes = new Set(types);
 
-    document.querySelectorAll('input[name=mode]').forEach((r) =>
-      r.addEventListener("change", () => { state.mode = r.value; render(); }));
-    $("#supplierSel").addEventListener("change", (e) => { state.filters.supplier = e.target.value; render(); });
+    document.querySelectorAll('input[name=mode]').forEach((r) => {
+      r.checked = r.value === state.mode;
+      r.addEventListener("change", () => { state.mode = r.value; save(); render(); });
+    });
+    $("#hideOrdered").checked = state.filters.hideOrdered;
+    $("#hideOrdered").addEventListener("change", (e) => {
+      state.filters.hideOrdered = e.target.checked;
+      save(); render();
+    });
+    $("#supplierSel").addEventListener("change", (e) => {
+      state.filters.supplier = e.target.value;
+      save(); render();
+    });
+    $("#searchBox").value = state.filters.search;
     let timer;
     $("#searchBox").addEventListener("input", (e) => {
       clearTimeout(timer);
-      timer = setTimeout(() => { state.filters.search = e.target.value.trim(); render(); }, 150);
+      timer = setTimeout(() => { state.filters.search = e.target.value.trim(); save(); render(); }, 150);
     });
 
     await loadUploads();

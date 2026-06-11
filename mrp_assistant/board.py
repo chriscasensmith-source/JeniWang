@@ -79,12 +79,72 @@ def computed_lines(conn: sqlite3.Connection, snapshot, cfg: dict,
     return out
 
 
+def _mark_key(item_number, supplier, request_date) -> str:
+    return f"{item_number}|{supplier or ''}|{request_date or ''}"
+
+
+def load_marks(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Latest 'ordered' mark per (item, supplier, request date). The table is
+    append-only events; the most recent row per key wins."""
+    marks: dict[str, dict] = {}
+    for r in conn.execute("SELECT * FROM order_marks ORDER BY id").fetchall():
+        key = _mark_key(r["item_number"], r["supplier"], r["request_date"])
+        marks[key] = {"marked": bool(r["marked"]), "ts": r["ts"], "note": r["note"]}
+    return marks
+
+
+def add_mark(conn: sqlite3.Connection, *, item_number: str, supplier, request_date,
+             marked: bool, note: str | None = None) -> None:
+    conn.execute(
+        "INSERT INTO order_marks (ts, item_number, supplier, request_date, marked, note) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (datetime.now().isoformat(timespec="seconds"), item_number,
+         supplier, request_date, int(marked), note),
+    )
+    conn.commit()
+
+
+def item_history(conn: sqlite3.Connection, item_number: str,
+                 supplier: str | None = None) -> list[dict]:
+    """That item's MRP messages across every stored snapshot, oldest first."""
+    sql = (
+        "SELECT s.snapshot_date, s.revision, m.msg_typ, m.request_date, "
+        "       m.required_qty, m.lead_time, m.qa_days "
+        "FROM mrp_lines m JOIN snapshots s ON s.id = m.snapshot_id "
+        "WHERE m.item_number = ?"
+    )
+    params: list = [item_number]
+    if supplier:
+        sql += " AND m.supplier = ?"
+        params.append(supplier)
+    sql += " ORDER BY s.snapshot_date, s.revision, m.request_date"
+    weeks: dict[tuple, dict] = {}
+    for r in conn.execute(sql, params).fetchall():
+        key = (r["snapshot_date"], r["revision"])
+        week = weeks.setdefault(
+            key, {"snapshot_date": r["snapshot_date"], "revision": r["revision"],
+                  "messages": [], "total_qty": 0.0},
+        )
+        week["messages"].append({
+            "msg_typ": r["msg_typ"], "request_date": r["request_date"],
+            "qty": r["required_qty"],
+        })
+        week["total_qty"] += r["required_qty"] or 0.0
+    return list(weeks.values())
+
+
 def build_board(conn: sqlite3.Connection, cfg: dict,
                 snapshot_id: int | None = None) -> dict | None:
     snapshot = get_snapshot(conn, snapshot_id)
     if snapshot is None:
         return None
     lines = computed_lines(conn, snapshot, cfg)
+    marks = load_marks(conn)
+    for line in lines:
+        rd = line.get("request_date")
+        key = _mark_key(line["item_number"], line.get("supplier"),
+                        rd.isoformat() if rd else None)
+        line["ordered"] = marks.get(key, {}).get("marked", False)
     ladders = load_tier_ladders(conn)
     cards = tier_cards(lines, ladders, cfg)
     return {
