@@ -9,10 +9,16 @@ rem  Leave this window open while you work; close it when done.
 rem ============================================================
 cd /d "%~dp0"
 
-rem Find a working Python. Try the "py" launcher first (python.org installs
-rem it even when the "Add to PATH" checkbox was missed), then plain python.
-rem The fake Microsoft Store stub fails these checks, so it gets skipped.
+rem Machines often have more than one Python that don't share libraries.
+rem Prefer whichever one already has the dependencies installed; only if
+rem none does, pick the first working Python and install into it.
+rem (The fake Microsoft Store stub fails these probes, so it gets skipped.)
+set "DEPS=import yaml, fastapi, uvicorn, openpyxl, pandas, multipart"
 set "PY="
+py -3 -c "%DEPS%" >nul 2>nul && set "PY=py -3"
+if not defined PY python -c "%DEPS%" >nul 2>nul && set "PY=python"
+if defined PY goto run
+
 py -3 -c "import sys" >nul 2>nul && set "PY=py -3"
 if not defined PY python -c "import sys" >nul 2>nul && set "PY=python"
 if not defined PY (
@@ -27,29 +33,25 @@ if not defined PY (
     exit /b 1
 )
 
-rem Check the actual dependencies, not the package itself: running from the
-rem project folder makes "import mrp_assistant" succeed even when nothing
-rem was ever installed.
-%PY% -c "import yaml, fastapi, uvicorn, openpyxl, pandas, multipart" >nul 2>nul
-if errorlevel 1 (
-    echo First-time setup: installing the MRP Ordering Assistant...
-    echo This happens only once and takes a minute or two.
-    %PY% -m pip install -e . || (
-        echo.
-        echo  Install failed - see the messages above.
-        echo  Take a screenshot of this window if you need help.
-        echo.
-        pause
-        exit /b 1
-    )
-    %PY% -c "import yaml, fastapi, uvicorn, openpyxl, pandas, multipart" || (
-        echo.
-        echo  Something is still missing after the install - see above.
-        echo.
-        pause
-        exit /b 1
-    )
+echo First-time setup: installing the MRP Ordering Assistant...
+echo This happens only once and takes a minute or two.
+%PY% -m pip install -e . || (
+    echo.
+    echo  Install failed - see the messages above.
+    echo  Take a screenshot of this window if you need help.
+    echo.
+    pause
+    exit /b 1
 )
+%PY% -c "%DEPS%" || (
+    echo.
+    echo  Something is still missing after the install - see above.
+    echo.
+    pause
+    exit /b 1
+)
+
+:run
 
 echo Starting the dashboard... your browser will open in a moment.
 echo Leave this window open while you work. Close it when you're done.
