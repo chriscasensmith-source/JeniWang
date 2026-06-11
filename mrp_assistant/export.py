@@ -15,6 +15,7 @@ FILLS = {
 }
 
 WORKSHEET_COLUMNS = [
+    ("Ordered", lambda l, m: "YES" if l.get("ordered") else ""),
     ("Msg Typ", lambda l, m: l["msg_typ"]),
     ("Item Number", lambda l, m: l["item_number"]),
     ("Description", lambda l, m: l["description"]),

@@ -10,14 +10,24 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 
 from . import db as dbmod
-from .board import build_board, list_snapshots
+from .board import add_mark, build_board, item_history, list_snapshots
 from .config import load_config
 from .export import diff_xlsx, worksheet_xlsx
 from .ingest import DEFAULT_ARCHIVE_DIR, ingest_file
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+class MarkBody(BaseModel):
+    """Module-level so FastAPI can resolve the postponed annotation."""
+    item_number: str
+    supplier: str | None = None
+    request_date: str | None = None
+    marked: bool
+    note: str | None = None
 
 
 def create_app(db_path=dbmod.DEFAULT_DB_PATH, config_path="config.yaml",
@@ -76,6 +86,21 @@ def create_app(db_path=dbmod.DEFAULT_DB_PATH, config_path="config.yaml",
             "skipped_sheets": result.skipped_sheets,
             "warnings": result.warnings,
         }
+
+    @app.post("/api/mark")
+    def mark(body: MarkBody):
+        """Tick/untick a line as ordered. Append-only events; keyed by
+        (item, supplier, request date) so the mark carries across weeks."""
+        with conn() as c:
+            add_mark(c, item_number=body.item_number, supplier=body.supplier,
+                     request_date=body.request_date, marked=body.marked,
+                     note=body.note)
+        return {"ok": True}
+
+    @app.get("/api/item_history")
+    def history(item_number: str, supplier: str | None = None):
+        with conn() as c:
+            return item_history(c, item_number, supplier)
 
     @app.get("/api/uploads")
     def uploads():

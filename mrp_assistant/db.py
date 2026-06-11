@@ -93,7 +93,18 @@ CREATE TABLE IF NOT EXISTS diffs (
     new_line_ids TEXT
 );
 
+CREATE TABLE IF NOT EXISTS order_marks (
+    id INTEGER PRIMARY KEY,
+    ts TEXT NOT NULL,
+    item_number TEXT NOT NULL,
+    supplier TEXT,
+    request_date TEXT,
+    marked INTEGER NOT NULL,         -- 1 = ordered, 0 = unmarked again
+    note TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_lines_snapshot ON mrp_lines(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_lines_item ON mrp_lines(item_number);
 CREATE INDEX IF NOT EXISTS idx_diffs_snapshot ON diffs(snapshot_id);
 """
 
