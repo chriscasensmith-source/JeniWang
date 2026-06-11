@@ -89,6 +89,26 @@
   #ingestBanner.dup { background: var(--yellow-bg); border: 1px solid #e3cf6c; color: var(--yellow-fg); }
   #ingestBanner.err { background: var(--red-bg); border: 1px solid #e5a3a3; color: var(--red-fg); }
   #ingestBanner.busy { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; }
+  .digest { background: #fff; border: 1px solid var(--border); border-left: 4px solid #2563eb;
+    padding: 6px 10px; margin: 4px 0 8px; font-size: 12.5px; }
+  .digest b { font-size: 14px; }
+  .digest .save { color: var(--green-fg); font-weight: 700; }
+  #staleBanner { background: var(--yellow-bg); border: 1px solid #e3cf6c; color: var(--yellow-fg);
+    padding: 6px 10px; margin: 4px 0; font-weight: 600; }
+  .supplier-group h3 button { float: right; }
+  button.copy-email { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 3px;
+    padding: 1px 8px; font-size: 11px; cursor: pointer; }
+  button.copy-email:hover { background: #e2e8f0; }
+  .ponote { margin-top: 4px; }
+  .ponote input { width: 260px; font-size: 11px; padding: 1px 4px; }
+  .ponote button { font-size: 11px; padding: 1px 8px; cursor: pointer; }
+  @media print {
+    header, #ingestBanner, #dropOverlay, tr.cfrow, .ponote, button { display: none !important; }
+    body { background: #fff; }
+    main { max-width: none; padding: 0; }
+    details { display: block; }
+    tr, td, th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
@@ -110,7 +130,9 @@
 <div id="ingestBanner" hidden></div>
 <main>
   <div id="error" hidden></div>
+  <div id="staleBanner" hidden></div>
   <div class="summary" id="summary"></div>
+  <div class="digest" id="digest" hidden></div>
   <div id="warnings"></div>
 
   <section id="sec-fire">
@@ -383,8 +405,68 @@ function detailRow(l) {
     ["slack days (deadline − dock)", m.slack_days],
     ["source: sheet row", l.row_id], ["db line id", l.line_id],
   ];
+  const note = l.actionable
+    ? `<div class="ponote">PO # / note: <input id="note_${l.line_id}" value="${esc(l.ordered_note || "")}" ` +
+      `placeholder="e.g. PO 4500123 placed ${fmtDate(state.board.today)}"> ` +
+      `<button class="po-save" data-line="${l.line_id}">save</button>` +
+      (l.ordered_ts ? ` <span class="muted">last updated ${esc(l.ordered_ts)}</span>` : "") + `</div>`
+    : "";
   return `<div class="inputs">${fields.map(([k, v]) => `<b>${k}:</b> ${esc(v)}`).join(" &nbsp;·&nbsp; ")}</div>` +
+         note +
          `<div class="hist" id="hist_${l.line_id}"><span class="muted">loading history…</span></div>`;
+}
+
+async function saveMark(line, marked, note) {
+  const res = await fetch("/api/mark", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      item_number: line.item_number, supplier: line.supplier,
+      request_date: line.request_date, marked,
+      note: note !== undefined ? note : (line.ordered_note || null),
+    }),
+  });
+  if (!res.ok) throw new Error(res.statusText);
+  const key = markKey(line);
+  state.board.lines.forEach((l) => {
+    if (markKey(l) === key) {
+      l.ordered = marked;
+      if (note !== undefined) l.ordered_note = note;
+    }
+  });
+}
+
+function copyOrderEmail(supplier) {
+  const b = state.board;
+  const lines = b.lines.filter((l) => l.actionable && String(l.supplier) === String(supplier));
+  const urgentItems = new Set(lines.filter((l) => !l.ordered && (modeOf(l).fire_drill || modeOf(l).status === "YELLOW")).map((l) => l.item_number));
+  const cards = b.tier_cards.filter((c) => c.supplier === String(supplier) && urgentItems.has(c.item_number));
+  const name = (lines[0] && lines[0].supplier_name) || supplier;
+  let out = `Subject: Order request — ${name}\n\nHi,\n\nWe'd like to place the following order(s):\n\n`;
+  for (const c of cards) {
+    const needBy = c.consolidated_messages.map((m) => m.effective_deadline).filter(Boolean).sort()[0];
+    out += `* Item ${c.item_number} — ${c.description || ""}\n`;
+    if (c.tier_status === "ok") {
+      const n = c.next_tier;
+      if (n && n.recommended) {
+        out += `    Quantity: ${n.tier.qty.toLocaleString("en-US")} ` +
+               `(raised from ${Math.round(c.aggregate_qty).toLocaleString("en-US")} to reach the ${n.tier.tier_str} tier @ $${n.tier.price}/unit)\n`;
+      } else {
+        out += `    Quantity: ${Math.round(c.aggregate_qty).toLocaleString("en-US")} ` +
+               `(${c.current_tier.tier_str} tier @ $${c.current_tier.price}/unit)\n`;
+      }
+    } else if (c.tier_status === "below_minimum") {
+      out += `    Quantity: ${Math.round(c.aggregate_qty).toLocaleString("en-US")} ` +
+             `(below the ${c.minimum_tier.tier_str} minimum tier — please advise)\n`;
+    } else {
+      out += `    Quantity: ${Math.round(c.aggregate_qty).toLocaleString("en-US")} (please send current pricing)\n`;
+    }
+    if (needBy) out += `    Needed at dock by: ${fmtDate(needBy)}\n`;
+    out += `\n`;
+  }
+  out += `Consolidated from our MRP snapshot dated ${fmtDate(b.snapshot.snapshot_date)}.\n\nThank you!\n`;
+  navigator.clipboard.writeText(out).then(
+    () => banner("ok", `Order email for <b>${esc(name)}</b> copied — paste it into Outlook (Ctrl+V).`),
+    () => banner("err", "Could not access the clipboard — select and copy from the export instead."));
 }
 
 async function loadHistory(l) {
@@ -410,6 +492,16 @@ async function loadHistory(l) {
 }
 
 document.addEventListener("click", (e) => {
+  if (e.target.classList.contains("po-save")) {
+    const line = state.board.lines.find((l) => l.line_id == e.target.dataset.line);
+    const input = document.getElementById(`note_${line.line_id}`);
+    const btn = e.target;
+    saveMark(line, line.ordered, input.value.trim()).then(
+      () => { btn.textContent = "saved ✓"; setTimeout(() => { btn.textContent = "save"; }, 1500); },
+      (err) => alert("Could not save the note: " + err.message));
+    return;
+  }
+  if (e.target.classList.contains("copy-email")) { copyOrderEmail(e.target.dataset.supplier); return; }
   // Sort on header click.
   const th = e.target.closest("th.sortable");
   if (th) {
@@ -439,16 +531,7 @@ document.addEventListener("change", async (e) => {
     if (!line) return;
     const marked = e.target.checked;
     try {
-      const res = await fetch("/api/mark", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_number: line.item_number, supplier: line.supplier,
-          request_date: line.request_date, marked,
-        }),
-      });
-      if (!res.ok) throw new Error(res.statusText);
-      const key = markKey(line);
-      state.board.lines.forEach((l) => { if (markKey(l) === key) l.ordered = marked; });
+      await saveMark(line, marked);
       render();
     } catch (err) {
       e.target.checked = !marked;
@@ -550,6 +633,34 @@ function render() {
   const clearBtn = $("#clearFilters");
   if (clearBtn) clearBtn.onclick = clearFilters;
 
+  // "What do I do today" digest — computed from ALL lines, ignoring filters.
+  const allAct = b.lines.filter((l) => l.actionable);
+  const fireAll = allAct.filter((l) => modeOf(l).fire_drill);
+  const yellowAll = allAct.filter((l) => modeOf(l).status === "YELLOW" && !modeOf(l).fire_drill);
+  const todo = [...fireAll, ...yellowAll].filter((l) => !l.ordered);
+  const orderedCount = allAct.filter((l) => l.ordered).length;
+  const bumps = b.tier_cards.filter((c) => c.next_tier && c.next_tier.recommended);
+  const bumpSave = bumps.reduce((s, c) => s + Math.max(0, -c.next_tier.incremental_spend), 0);
+  const pricingFlags = b.tier_cards.filter((c) => c.tier_status === "no_data" || c.tier_status === "incomplete").length;
+  const digest = $("#digest");
+  digest.hidden = false;
+  digest.innerHTML =
+    `This week: <b>${todo.length}</b> line${todo.length === 1 ? "" : "s"} still to order ` +
+    `across <b>${new Set(todo.map((l) => l.supplier)).size}</b> supplier(s)` +
+    (orderedCount ? ` · <b>${orderedCount}</b> already ticked ordered` : "") +
+    (bumps.length ? ` · tier bumps recommended on <b>${bumps.length}</b> item(s), <span class="save">net saving ${fmtMoney(bumpSave)}</span>` : "") +
+    (pricingFlags ? ` · <b>${pricingFlags}</b> item(s) lack pricing — request quotes` : "");
+
+  // Nudge when looking at the latest snapshot but it has gone stale.
+  const stale = $("#staleBanner");
+  const latest = state.meta && state.meta.snapshots[0];
+  const ageDays = Math.floor((new Date(b.today) - new Date(b.snapshot.snapshot_date)) / 86400000);
+  if (latest && latest.id === b.snapshot.id && ageDays > 8) {
+    stale.hidden = false;
+    stale.textContent = `⚠ The newest data here is ${ageDays} days old (snapshot ${fmtDate(b.snapshot.snapshot_date)}). ` +
+      `Export this week's MRP messages from JDE and drop the file on this page.`;
+  } else stale.hidden = true;
+
   $("#fireBody").innerHTML = rowsTable("fire", fire, b.lines);
 
   const urgent = [...fire, ...yellow];
@@ -565,7 +676,8 @@ function render() {
     const cards = b.tier_cards.filter((c) => c.supplier === String(supplier ?? "") && itemSet.has(c.item_number));
     const yl = supplierLines.filter((l) => modeOf(l).status === "YELLOW" && !fireIds.has(l.line_id));
     nowHtml += `<div class="supplier-group"><h3>${esc(supplierLines[0].supplier_name || info.name || supplier)}` +
-      ` <span class="coo">#${esc(supplier)}${info.coo ? " · " + esc(info.coo) : ""}</span></h3>` +
+      ` <span class="coo">#${esc(supplier)}${info.coo ? " · " + esc(info.coo) : ""}</span>` +
+      ` <button class="copy-email" data-supplier="${esc(supplier)}" title="Copy a ready-to-paste order email for this supplier">📋 copy order email</button></h3>` +
       `<div class="cards">${cards.map(tierCardHtml).join("")}</div>` +
       (yl.length ? rowsTable("now", yl, b.lines) : `<p class="muted">no yellow-window lines — items above are in the fire drill</p>`) +
       `</div>`;

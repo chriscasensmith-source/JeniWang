@@ -144,7 +144,10 @@ def build_board(conn: sqlite3.Connection, cfg: dict,
         rd = line.get("request_date")
         key = _mark_key(line["item_number"], line.get("supplier"),
                         rd.isoformat() if rd else None)
-        line["ordered"] = marks.get(key, {}).get("marked", False)
+        mark = marks.get(key)
+        line["ordered"] = mark["marked"] if mark else False
+        line["ordered_note"] = mark.get("note") if mark else None
+        line["ordered_ts"] = mark.get("ts") if mark else None
     ladders = load_tier_ladders(conn)
     cards = tier_cards(lines, ladders, cfg)
     return {
